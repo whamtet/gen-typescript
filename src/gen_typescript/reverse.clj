@@ -33,6 +33,11 @@
   (let [m (_parse-ts lines)]
     (zipmap (map first m) (map rest m))))
 
+(defn abbreviate [s]
+  (->> (.split s "_")
+       (map #(.substring % 0 3))
+       (string/join "_")))
+
 (defn _gen-sample [registry k]
   (let [[super & kvs] (registry k)]
     (concat
@@ -41,8 +46,8 @@
        (format "%s: %s,"
                k
                (case v
-                 "string" (format "'%s' + Math.random()" k)
-                 "number" "Math.random()"))))))
+                 "string" (format "'%s' + (Math.random() * 100).toFixed(0)" (abbreviate k))
+                 "number" "Math.floor(Math.random() * 100000)"))))))
 
 (defn gen-sample [registry k]
   (string/join "\n" (_gen-sample registry k)))
