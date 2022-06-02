@@ -23,7 +23,7 @@
        (recur todo (safe-conj done curr) [interface super])
        [_ interface] (re-find #"interface (\w+)" line)
        (recur todo (safe-conj done curr) [interface nil])
-       [_ k type] (re-find #"(\w+): (\w+)" line)
+       [_ k type] (re-find #"(\w+): ([\w\[\]]+)" line)
        (recur todo done (conj curr [k type]))
        _ :else
        (recur todo done curr))
@@ -38,23 +38,29 @@
        (map #(.substring % 0 3))
        (string/join "_")))
 
-(defn _gen-sample [registry k]
-  (let [[super & kvs] (registry k)]
-    (concat
-     (some->> super (_gen-sample registry))
-     (for [[k v] kvs]
-       (format "%s: %s,"
-               k
-               (case v
-                 "string" (format "'%s' + (Math.random() * 100).toFixed(0)" (abbreviate k))
-                 "number" "Math.floor(Math.random() * 100000)"))))))
+(def exceptions
+  {"interval" "'2022-05-01T12:00:00Z'"})
 
 (defn gen-sample [registry k]
-  (string/join "\n" (_gen-sample registry k)))
+  (let [[super & kvs] (registry k)]
+    (string/join "\n"
+                 (concat
+                  (some->> super (gen-sample registry))
+                  (for [[k v] kvs]
+                    (format "%s: %s,"
+                            k
+                            (or
+                             (exceptions k)
+                             (case v
+                               "string" (format "'%s' + (Math.random() * 100).toFixed(0)" (abbreviate k))
+                               "number" "Math.floor(Math.random() * 100000)"
+                               (format
+                                (if (.endsWith v "[]") "[{\n%s\n}]" "{\n%s\n}")
+                                (gen-sample registry (.replace v "[]" "")))))))))))
 
 (-> "sample.ts"
     slurp
     (.split "\n")
     parse-ts
-    (gen-sample "TopItem")
+    (gen-sample "SalesAggregated")
     println)
